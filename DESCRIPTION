@@ -1,0 +1,23 @@
+Package: xyt
+Type: Package
+Title: Extract Raster Time Series Values at Points in Space and Time
+Version: 0.0.0.9000
+Authors@R: c(
+   person("Michael D.", "Sumner", role = c("aut", "cre"), email = "michael.sumner@aad.gov.au")
+   )
+Description: Extract values from a time series of rasters at points that each
+    carry their own date-time. The series is described by a reader function
+    rather than by data held in memory, so only the time slices actually
+    needed are read. Values are taken from the slice nearest in time, or
+    interpolated linearly between the two slices that bracket each point.
+Depends:
+    R (>= 4.1.0)
+Imports:
+    terra (>= 1.7.0)
+Suggests:
+    testthat (>= 3.0.0)
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0
