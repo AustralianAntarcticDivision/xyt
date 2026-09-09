@@ -92,6 +92,38 @@ A catalogue given as a function is called once, the first time it is needed,
 and reused for the life of the source, which matters when building it costs a
 directory listing.
 
+## Reading slices in parallel
+
+The work divides cleanly. One slice is read, the points that want it are
+extracted, and a plain numeric vector comes back; nothing is shared between
+slices and no SpatRaster crosses a process boundary. So the reads can go on
+mirai daemons, and `extract_xyt()` will use them without being told to:
+
+``` r
+mirai::daemons(6)
+mirai::everywhere({ library(raadtools) })   # whatever the reader needs
+
+extract_xyt(read, xyt)
+
+mirai::daemons(0)
+```
+
+`mirai::everywhere()` is the part that is easy to forget: a daemon runs the
+reader in a fresh session, so any package the reader reaches for has to be
+loaded there. The reader itself is sent along with the task.
+
+The first slice is always read in the calling session. It supplies the target
+coordinate system that every other task needs, and it means a reader that is
+going to fail fails once rather than in six daemons at once.
+
+Whether it is faster is a question about where the bytes come from, not about
+the code: a hundred slices off a remote store is latency bound and
+parallelises well, ten slices off an already saturated local disk does not.
+`dev/bench-mirai.R` measures it for a given collection.
+
+`map` takes any function of `(X, FUN)`, so `map = lapply` forces serial reads
+and anything else you have can be dropped in.
+
 ## What changed from the raadtools version
 
 Behaviour that was implicit is now an argument, and a few things were wrong.

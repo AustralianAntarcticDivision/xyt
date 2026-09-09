@@ -6,11 +6,10 @@
 #' it.
 #'
 #' Only the slices that some point actually needs are read, and each of those
-#' is read exactly once, however many points fall on it and whatever order the
-#' rows arrive in.
+#' is read exactly once.
 #'
-#' @param read a reader function. See the reader contract in [xyt] and
-#'   [xyt_reader_check()].
+#' @param read a reader function. See the reader contract in [xyt],
+#'   [xyt_reader_check()] and [xyt_source()].
 #' @param xyt a data.frame or matrix with three columns: x, y and time. Extra
 #'   columns are ignored. The time column may be POSIXct, Date or character.
 #' @param ctstime interpolate linearly in time between bracketing slices
@@ -34,6 +33,9 @@
 #' @param tolerance how far, in days, a point may sit from the slice matched
 #'   to it before its value is refused and returned as `NA`. `NULL`, the
 #'   default, derives it from the spacing of the series.
+#' @param map how the per-slice reads are run. `NULL`, the default, uses
+#'   mirai daemons if any are running and reads serially otherwise. Pass
+#'   [base::lapply()] to force serial, or see [xyt_map_mirai()].
 #' @param verbose report progress as slices are read.
 #' @param ... passed to `read`, and only to `read`.
 #'
@@ -61,18 +63,20 @@ extract_xyt <- function(read, xyt,
                         crs = "EPSG:4326",
                         files = NULL,
                         tolerance = NULL,
+                        map = NULL,
                         verbose = interactive(),
                         ...) {
   if (!is.function(read)) stop("'read' must be a function", call. = FALSE)
   when <- match.arg(when)
   method <- match.arg(method)
+  dots <- list(...)
 
   input <- .xyt_input(xyt)
   xy <- input$xy
   times <- input$times
   n <- nrow(xy)
 
-  files <- if (is.null(files)) .catalogue(read, ...) else .check_catalogue(files)
+  files <- if (is.null(files)) .catalogue(read, dots) else .check_catalogue(files)
   dates <- .xyt_times(files$date, "catalogue dates")
 
   if (is.null(tolerance)) tolerance <- .tolerance_days(dates)
@@ -94,37 +98,53 @@ extract_xyt <- function(read, xyt,
 
   v_lo <- rep(NA_real_, n)
   v_hi <- rep(NA_real_, n)
+  if (length(needed) < 1L) return(v_lo)
 
-  target <- NULL
-  xy_target <- NULL
+  ## which rows each slice owes a value to, decided once, up front, so a task
+  ## depends on nothing but its own slice number
+  rows_lo <- lapply(needed, function(j) which(keep & lo == j))
+  rows_hi <- lapply(needed, function(j) which(keep & hi == j & p > 0))
 
-  for (k in seq_along(needed)) {
-    j <- needed[k]
-    if (verbose) {
-      message(sprintf("reading slice %i of %i: %s", k, length(needed),
-                      format(dates[j], "%Y-%m-%d %H:%M:%S")))
-    }
-    r <- .read_slice(read, dates[j], files, fact, ...)
+  ## The first slice is read here rather than in a task. It gives the target
+  ## coordinate system, which every other task needs, and it fails fast: a
+  ## reader that is going to raise is better raising once than in every
+  ## daemon at once.
+  if (verbose) message(sprintf("reading slice 1 of %i", length(needed)))
+  r1 <- .read_slice(read, dates[needed[1L]], files, fact, dots)
+  xy_target <- .to_crs(xy, from = crs, to = terra::crs(r1))
+  first <- .slice_values(r1, xy_target, rows_lo[[1L]], rows_hi[[1L]], method)
+  rm(r1)
 
-    if (is.null(target)) {
-      target <- terra::crs(r)
-      xy_target <- .to_crs(xy, from = crs, to = target)
+  rest <- seq_along(needed)[-1L]
+  if (length(rest) > 0L) {
+    map <- .resolve_map(map, verbose, length(needed))
+    task <- function(k) {
+      r <- .read_slice(read, dates[needed[k]], files, fact, dots)
+      .slice_values(r, xy_target, rows_lo[[k]], rows_hi[[k]], method)
     }
+    got <- map(rest, task)
+  } else {
+    got <- list()
+  }
 
-    want_lo <- keep & lo == j
-    want_hi <- keep & hi == j & p > 0
-    if (any(want_lo)) {
-      v_lo[want_lo] <- .extract_points(r, xy_target[want_lo, , drop = FALSE], method)
-    }
-    if (any(want_hi)) {
-      v_hi[want_hi] <- .extract_points(r, xy_target[want_hi, , drop = FALSE], method)
-    }
+  for (res in c(list(first), got)) {
+    v_lo[res$rows_lo] <- res$lo
+    v_hi[res$rows_hi] <- res$hi
   }
 
   out <- v_lo
   moving <- !is.na(v_lo) & p > 0
   out[moving] <- v_lo[moving] * (1 - p[moving]) + v_hi[moving] * p[moving]
   out
+}
+
+## Everything one slice contributes, as plain vectors: nothing here holds a
+## SpatRaster, so a task's result crosses a process boundary intact.
+.slice_values <- function(r, xy_target, rows_lo, rows_hi, method) {
+  list(rows_lo = rows_lo,
+       lo = if (length(rows_lo)) .extract_points(r, xy_target[rows_lo, , drop = FALSE], method) else numeric(0),
+       rows_hi = rows_hi,
+       hi = if (length(rows_hi)) .extract_points(r, xy_target[rows_hi, , drop = FALSE], method) else numeric(0))
 }
 
 ## Split the input into a coordinate matrix and a vector of times.
@@ -151,8 +171,8 @@ extract_xyt <- function(read, xyt,
 
 ## The catalogue call, with the checks that turn a wrong-shaped reader into a
 ## sentence rather than a subscript error twenty lines later.
-.catalogue <- function(read, ...) {
-  files <- read(returnfiles = TRUE, ...)
+.catalogue <- function(read, dots = list()) {
+  files <- do.call(read, c(list(returnfiles = TRUE), dots))
   if (!is.data.frame(files)) {
     stop("read(returnfiles = TRUE) must return a data.frame, not ",
          paste(class(files), collapse = "/"), call. = FALSE)
@@ -182,8 +202,8 @@ extract_xyt <- function(read, xyt,
 ## One slice, optionally aggregated. A reader is allowed to hand back
 ## something with more than one layer, but not to this function: the caller
 ## has to pick, with an argument the reader understands.
-.read_slice <- function(read, date, files, fact = NULL, ...) {
-  r <- read(date, inputfiles = files, ...)
+.read_slice <- function(read, date, files, fact = NULL, dots = list()) {
+  r <- do.call(read, c(list(date), list(inputfiles = files), dots))
   if (!inherits(r, "SpatRaster")) {
     stop("the reader returned ", paste(class(r), collapse = "/"),
          ", not a SpatRaster", call. = FALSE)

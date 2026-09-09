@@ -24,6 +24,12 @@ library(xyt)
 library(raadtools)
 source("dev/adapters.R")
 
+## readsst raises the compat notice on every read, which is ten warnings in a
+## comparison that is not about the compat layer
+options(raadtools.shim.warn = FALSE)
+
+## set.seed() immediately before rnorm(), every time: the whole comparison is
+## against a recorded draw, and any intervening use of the generator moves it
 set.seed(1)
 laea <- cbind(1:10, rnorm(10))
 ll <- terra::project(laea, from = "+proj=laea +ellps=sphere", to = "EPSG:4326")

@@ -14,13 +14,14 @@ extract_xyt(
   crs = "EPSG:4326",
   files = NULL,
   tolerance = NULL,
+  map = NULL,
   verbose = interactive(),
   ...
 )
 }
 \arguments{
-\item{read}{a reader function. See the reader contract in \link{xyt} and
-\code{\link[=xyt_reader_check]{xyt_reader_check()}}.}
+\item{read}{a reader function. See the reader contract in \link{xyt},
+\code{\link[=xyt_reader_check]{xyt_reader_check()}} and \code{\link[=xyt_source]{xyt_source()}}.}
 
 \item{xyt}{a data.frame or matrix with three columns: x, y and time. Extra
 columns are ignored. The time column may be POSIXct, Date or character.}
@@ -53,6 +54,10 @@ so a reader only has to do the one job of reading a slice. See also
 to it before its value is refused and returned as \code{NA}. \code{NULL}, the
 default, derives it from the spacing of the series.}
 
+\item{map}{how the per-slice reads are run. \code{NULL}, the default, uses
+mirai daemons if any are running and reads serially otherwise. Pass
+\code{\link[base:lapply]{base::lapply()}} to force serial, or see \code{\link[=xyt_map_mirai]{xyt_map_mirai()}}.}
+
 \item{verbose}{report progress as slices are read.}
 
 \item{...}{passed to \code{read}, and only to \code{read}.}
@@ -68,8 +73,7 @@ it.
 }
 \details{
 Only the slices that some point actually needs are read, and each of those
-is read exactly once, however many points fall on it and whatever order the
-rows arrive in.
+is read exactly once.
 
 \code{...} reaches the reader alone. This is a deliberate departure from the
 version of this code that lived in raadtools, where \code{...} was passed to
