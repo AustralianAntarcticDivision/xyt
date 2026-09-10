@@ -30,6 +30,11 @@
 #'   `date` column. Supplied here, `read(returnfiles = TRUE)` is never called,
 #'   so a reader only has to do the one job of reading a slice. See also
 #'   [xyt_source()].
+#' @param share put the catalogue into shared memory with
+#'   [mori::share()], so that it is mapped by the daemons rather than copied
+#'   to each of them. `NULL`, the default, does it when mori is installed and
+#'   mirai daemons are running, and otherwise leaves the catalogue alone.
+#'   `TRUE` insists, `FALSE` refuses.
 #' @param tolerance how far, in days, a point may sit from the slice matched
 #'   to it before its value is refused and returned as `NA`. `NULL`, the
 #'   default, derives it from the spacing of the series.
@@ -62,6 +67,7 @@ extract_xyt <- function(read, xyt,
                         fact = NULL,
                         crs = "EPSG:4326",
                         files = NULL,
+                        share = NULL,
                         tolerance = NULL,
                         map = NULL,
                         verbose = interactive(),
@@ -118,6 +124,17 @@ extract_xyt <- function(read, xyt,
   rest <- seq_along(needed)[-1L]
   if (length(rest) > 0L) {
     map <- .resolve_map(map, verbose, length(needed))
+    ## Everything this closure captures is sent with every task, and the
+    ## catalogue is the big part of it: a 16000-row raadfiles catalogue of
+    ## long paths serialises to about 3.2 MB, once per slice. Shared, it
+    ## serialises to its name and the daemons map the same pages.
+    ##
+    ## The reader still receives the same catalogue, with the same rows in the
+    ## same order. That is the point of doing it this way rather than cutting
+    ## the catalogue down to the slices being read: a reader is entitled to
+    ## look at more of it than the row it matched, and xyt's own
+    ## synthetic_reader() does exactly that.
+    files <- .share_catalogue(files, share)
     task <- function(k) {
       r <- .read_slice(read, dates[needed[k]], files, fact, dots)
       .slice_values(r, xy_target, rows_lo[[k]], rows_hi[[k]], method)
@@ -182,6 +199,29 @@ extract_xyt <- function(read, xyt,
          call. = FALSE)
   }
   .check_catalogue(files, "the reader's catalogue")
+}
+
+## Hand the catalogue to the daemons by name rather than by value. Sharing is
+## worth the copy into shared memory only when something else is going to read
+## it out of another process, so by default this waits for daemons.
+.share_catalogue <- function(files, share = NULL) {
+  if (isFALSE(share)) return(files)
+  have <- requireNamespace("mori", quietly = TRUE)
+  if (!have) {
+    if (isTRUE(share)) {
+      stop("share = TRUE needs the 'mori' package:\n  install.packages(\"mori\")",
+           call. = FALSE)
+    }
+    return(files)
+  }
+  if (isTRUE(mori::is_shared(files))) return(files)
+  if (is.null(share) && .mirai_daemons() < 1L) return(files)
+  shared <- try(mori::share(files), silent = TRUE)
+  if (inherits(shared, "try-error")) {
+    if (isTRUE(share)) stop(attr(shared, "condition")$message, call. = FALSE)
+    return(files)
+  }
+  shared
 }
 
 .check_catalogue <- function(files, what = "'files'") {

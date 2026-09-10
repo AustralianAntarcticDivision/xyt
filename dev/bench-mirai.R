@@ -1,15 +1,20 @@
-## Is the catalogue what makes daemons disappointing?
+## What the catalogue costs the daemons, and what to do about it.
 ##
 ## extract_xyt() builds one closure per run and mirai sends it with every
 ## task. That closure captures the catalogue, so a 16000-row raadfiles
-## catalogue of long paths goes down the wire once per slice. This measures
-## whether that is actually the cost, before anyone adds a dependency to fix
-## it.
+## catalogue of long paths goes down the wire once per slice.
 ##
-## Four rows: serial, daemons with the catalogue as it comes, daemons with
-## the catalogue cut to the rows the query needs, and daemons with it in
-## shared memory via mori. The middle one needs no new package, so if it
-## closes the gap, mori is not needed.
+## Measured, six daemons, 200 OISST slices: 16.8 s copied, 9.4 s slimmed,
+## 9.2 s shared. The payload was the cost.
+##
+## extract_xyt() shares by default now, so the rows below ask for
+## share = FALSE where they mean the old behaviour.
+##
+## The slim row is kept as the road not taken. It is as fast, and it is NOT
+## safe: it changes what the reader is handed, and a reader may look at more
+## of the catalogue than the row it matched. synthetic_reader() takes its
+## slice number from the row's position, so slimming moves its answers on a
+## sparse track. Sharing changes nothing the reader can see.
 ##
 ##   Rscript dev/bench-mirai.R
 
@@ -59,16 +64,16 @@ timeit <- function(label, ...) {
 }
 
 cat("\n")
-v1 <- timeit("serial, full", files = files, map = lapply)
+v1 <- timeit("serial, full", files = files, share = FALSE, map = lapply)
 
 mirai::daemons(6)
 mirai::everywhere({ library(raadtools); library(xyt) })
-v2 <- timeit("6 daemons, full", files = files)
-v3 <- timeit("6 daemons, slim", files = slim)
-v4 <- if (have_mori) timeit("6 daemons, mori", files = shared) else NULL
+v2 <- timeit("6 daemons, copied", files = files, share = FALSE)
+v3 <- timeit("6 daemons, slim", files = slim, share = FALSE)
+v4 <- if (have_mori) timeit("6 daemons, shared", files = files) else NULL
 mirai::daemons(0)
 
 cat("\nsame answer as serial:\n")
-cat("  full ", isTRUE(all.equal(v1, v2)), "\n")
-cat("  slim ", isTRUE(all.equal(v1, v3)), "\n")
-if (have_mori) cat("  mori ", isTRUE(all.equal(v1, v4)), "\n")
+cat("  copied ", isTRUE(all.equal(v1, v2)), "\n")
+cat("  slim   ", isTRUE(all.equal(v1, v3)), "   (true here, not in general)\n")
+if (have_mori) cat("  shared ", isTRUE(all.equal(v1, v4)), "\n")
