@@ -13,6 +13,7 @@ extract_xyt(
   fact = NULL,
   crs = "EPSG:4326",
   files = NULL,
+  share = NULL,
   tolerance = NULL,
   map = NULL,
   verbose = interactive(),
@@ -49,6 +50,12 @@ raster's own system before extraction.}
 \code{date} column. Supplied here, \code{read(returnfiles = TRUE)} is never called,
 so a reader only has to do the one job of reading a slice. See also
 \code{\link[=xyt_source]{xyt_source()}}.}
+
+\item{share}{put the catalogue into shared memory with
+\code{\link[mori:share]{mori::share()}}, so that it is mapped by the daemons rather than copied
+to each of them. \code{NULL}, the default, does it when mori is installed and
+mirai daemons are running, and otherwise leaves the catalogue alone.
+\code{TRUE} insists, \code{FALSE} refuses.}
 
 \item{tolerance}{how far, in days, a point may sit from the slice matched
 to it before its value is refused and returned as \code{NA}. \code{NULL}, the
