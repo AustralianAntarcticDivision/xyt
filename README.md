@@ -5,12 +5,10 @@ date-time.
 
 This is the `extract(<read function>, <data.frame>)` machinery from
 [raadtools](https://github.com/AustralianAntarcticDivision/raadtools), lifted
-out on its own, rewritten against terra, and given a test suite that runs
-with no data behind it.
+out on its own. 
 
-The name is a placeholder.
 
-## The idea
+## How it works
 
 The series is described by a *reader function* rather than held in memory, so
 it can be far larger than memory and can live anywhere the reader can reach.
@@ -44,7 +42,7 @@ read(returnfiles = TRUE, ...)        # -> data.frame with a `date` column
 read(date, inputfiles = files, ...)  # -> single-layer SpatRaster
 ```
 
-That is the whole interface. Nothing in it is specific to any data
+Nothing is specific to any data
 collection, which is why the tests can run against a synthetic series and why
 raadtools' readers work unchanged.
 
@@ -94,7 +92,7 @@ directory listing.
 
 ## Reading slices in parallel
 
-The work divides cleanly. One slice is read, the points that want it are
+One slice is read, the points that want it are
 extracted, and a plain numeric vector comes back; nothing is shared between
 slices and no SpatRaster crosses a process boundary. So the reads can go on
 mirai daemons, and `extract_xyt()` will use them without being told to:
@@ -108,7 +106,7 @@ extract_xyt(read, xyt)
 mirai::daemons(0)
 ```
 
-`mirai::everywhere()` is the part that is easy to forget: a daemon runs the
+`mirai::everywhere()` is important: a daemon runs the
 reader in a fresh session, so any package the reader reaches for has to be
 loaded there. The reader itself is sent along with the task.
 
@@ -118,7 +116,7 @@ going to fail fails once rather than in six daemons at once.
 
 Whether it is faster is a question about where the bytes come from, not about
 the code: a hundred slices off a remote store is latency bound and
-parallelises well, ten slices off an already saturated local disk does not.
+parallelizes well, ten slices off an already saturated local disk does not.
 `dev/bench-mirai.R` measures it for a given collection.
 
 `map` takes any function of `(X, FUN)`, so `map = lapply` forces serial reads
@@ -156,10 +154,7 @@ Behaviour that was implicit is now an argument, and a few things were wrong.
   two midnights. A track written with whole days at the start and times later
   would lose every time of day, silently.
 
-## Building it
-
-There are no `man/` pages in the repository yet: run `roxygen2::roxygenise()`
-once and they are generated from the sources.
+## Dev
 
 The tests are ordinary testthat files. They can also be run somewhere that
 has terra and nothing else:
@@ -170,3 +165,8 @@ Rscript dev/run-tests.R
 
 That script defines just enough of the `expect_*` vocabulary to run the same
 test files, sources `R/`, and runs them. It is not part of the package.
+
+
+## Code of Conduct
+  
+Please note that the xyt project is released with a [Contributor Code of Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html). By contributing to this project, you agree to abide by its terms.
