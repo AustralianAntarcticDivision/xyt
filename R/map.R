@@ -30,6 +30,12 @@
 #' Reading ten slices off a local disk that is already saturated will not.
 #'
 #' @seealso [extract_xyt()]
+#' @examples
+#' if (requireNamespace("mirai", quietly = TRUE)) {
+#'   ## a mapper to hand to extract_xyt(map = )
+#'   mapper <- xyt_map_mirai()
+#'   mapper
+#' }
 #' @export
 xyt_map_mirai <- function(...) {
   if (!requireNamespace("mirai", quietly = TRUE)) {

@@ -38,6 +38,13 @@ Whether this is faster depends on where the bytes come from. Reading a
 hundred slices off a remote store is latency bound and parallelises well.
 Reading ten slices off a local disk that is already saturated will not.
 }
+\examples{
+if (requireNamespace("mirai", quietly = TRUE)) {
+  ## a mapper to hand to extract_xyt(map = )
+  mapper <- xyt_map_mirai()
+  mapper
+}
+}
 \seealso{
 \code{\link[=extract_xyt]{extract_xyt()}}
 }
