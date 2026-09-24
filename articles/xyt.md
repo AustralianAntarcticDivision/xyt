@@ -1,0 +1,263 @@
+# Extracting a raster time series at points in space and time
+
+`xyt` answers one question: given a series of rasters that changes
+through time, and a set of points that each carry their own date-time,
+what is the value of the series at each point?
+
+The series is not held in memory. It is described by a *reader
+function*, so it can be far larger than memory and can live anywhere the
+reader can reach. Only the time slices some point actually needs are
+read, and each of those is read exactly once.
+
+``` r
+
+library(xyt)
+```
+
+## A series with no files behind it
+
+Everything in this vignette that runs uses
+[`synthetic_reader()`](https://australianantarcticdivision.github.io/xyt/reference/synthetic_reader.md),
+a reader over a small in-memory series whose values are known in closed
+form. It exists so the machinery can be exercised, and its answers
+checked against arithmetic, without any files, network or credentials.
+
+Each slice holds the value `100 * x + y + i`, where `x` and `y` are the
+coordinates of the cell centre and `i` is the one-based position of the
+slice in the series. The default series is ten daily slices starting
+2000-01-01.
+
+``` r
+
+read <- synthetic_reader()
+head(read(returnfiles = TRUE))
+#>         date      fullname
+#> 1 2000-01-01 synthetic-001
+#> 2 2000-01-02 synthetic-002
+#> 3 2000-01-03 synthetic-003
+#> 4 2000-01-04 synthetic-004
+#> 5 2000-01-05 synthetic-005
+#> 6 2000-01-06 synthetic-006
+```
+
+## Extracting values
+
+`xyt` is a data.frame (or matrix) of three columns: x, y and a time. The
+time column may be `POSIXct`, `Date` or character.
+
+``` r
+
+xyt <- data.frame(
+  x = c(0.5, 2.5),
+  y = c(0.5, 3.5),
+  t = as.POSIXct(c("2000-01-01", "2000-01-05"), tz = "UTC")
+)
+
+extract_xyt(read, xyt)
+#> [1]  51.5 258.5
+```
+
+The first point sits on slice 1, the second on slice 5, so by the closed
+form the answers are `100 * 0.5 + 0.5 + 1` and `100 * 2.5 + 3.5 + 5`.
+`simple` extraction snaps each point to the centre of the cell it falls
+in, which is why fractional coordinates come back on the half-cell.
+
+## Interpolating in time and in space
+
+By default a point takes its value from a single slice. With
+`ctstime = TRUE` the value is interpolated linearly in time between the
+two slices that bracket the point:
+
+``` r
+
+mid <- data.frame(x = 0.5, y = 0.5,
+                  t = as.POSIXct("2000-01-03 12:00:00", tz = "UTC"))
+
+extract_xyt(read, mid)                   # nearest slice
+#> [1] 53.5
+extract_xyt(read, mid, ctstime = TRUE)   # interpolated in time
+#> [1] 54
+```
+
+`method = "bilinear"` interpolates in space as well, using a
+distance-weighted average of the four nearest cell centres rather than
+snapping to one cell:
+
+``` r
+
+extract_xyt(read, mid, method = "bilinear")
+#> [1] 53.5
+extract_xyt(read, mid, ctstime = TRUE, method = "bilinear")
+#> [1] 54
+```
+
+Because the synthetic field is linear in x, y and time, the fully
+interpolated answer is exactly `100 * x + y + i + p`, where `p` is the
+fraction of the way between slices.
+
+## Points outside the series
+
+A point further in time from any slice than `tolerance` (by default 1.5
+times the spacing of the series) is returned as `NA`, with a warning,
+rather than stopping the whole call:
+
+``` r
+
+off <- data.frame(x = 0.5, y = 0.5,
+                  t = as.POSIXct("2001-06-01", tz = "UTC"))
+extract_xyt(read, off)
+#> Warning: 1 of 1 points are more than 1.5 days from any slice; returning NA for
+#> those
+#> [1] NA
+```
+
+## The reader contract
+
+A reader is any function supporting two calls:
+
+``` r
+
+read(returnfiles = TRUE, ...)        # -> data.frame with a `date` column
+read(date, inputfiles = files, ...)  # -> single-layer SpatRaster
+```
+
+The first call is the catalogue: one row per available slice, in
+ascending date order. The second reads one slice. Nothing in the
+contract is specific to any collection, which is why the tests run
+against a synthetic series and why readers written before this package
+satisfy it unchanged.
+
+[`xyt_reader_check()`](https://australianantarcticdivision.github.io/xyt/reference/xyt_reader_check.md)
+runs those calls in the order
+[`extract_xyt()`](https://australianantarcticdivision.github.io/xyt/reference/extract_xyt.md)
+will make them and reports what came back. Use it when wiring up a new
+source:
+
+``` r
+
+invisible(xyt_reader_check(synthetic_reader()))
+#> PASS is a function
+#> PASS read(returnfiles = TRUE) succeeds
+#> PASS the catalogue is a data.frame: data.frame
+#> PASS the catalogue has a 'date' column: date, fullname
+#> PASS the dates are date-times: POSIXct/POSIXt
+#> PASS the dates have no missing values
+#> PASS the dates are in ascending order
+#> PASS the catalogue has at least one row: 10 rows
+#> PASS the series has a resolution: 1 days
+#> PASS read(date, inputfiles = files) succeeds
+#> PASS it returns a SpatRaster: SpatRaster
+#> PASS it returns one layer: 1 layers
+#> PASS it declares a coordinate reference system
+#> PASS a second date reads too
+#> PASS the two slices have the same geometry
+#> PASS the two slices differ in value: identical slices usually mean the date argument was ignored
+```
+
+## Writing a reader without the flag
+
+The `returnfiles` switch is awkward to write by hand, because the return
+type depends on the value of an argument.
+[`xyt_source()`](https://australianantarcticdivision.github.io/xyt/reference/xyt_source.md)
+writes it for you from two ordinary functions: one that returns the
+catalogue, and one that reads a slice.
+
+``` r
+
+r <- lapply(1:2, function(i) {
+  x <- terra::rast(terra::ext(0, 4, 0, 4), resolution = 1, crs = "EPSG:4326")
+  terra::values(x) <- i
+  x
+})
+
+src <- xyt_source(
+  slice = function(date, files, ...) r[[which(files$date == date)]],
+  catalogue = data.frame(
+    date = as.POSIXct(c("2000-01-01", "2000-01-02"), tz = "UTC")
+  )
+)
+
+extract_xyt(src, data.frame(x = 1, y = 1,
+                            t = as.POSIXct("2000-01-02", tz = "UTC")))
+#> [1] 2
+```
+
+A catalogue supplied as a *function* is called once, the first time it
+is needed, and reused for the life of the source. That matters when
+building it costs a directory listing or a network round-trip.
+
+## A real collection
+
+The example below is not evaluated, because building a vignette must not
+reach the network, but it shows the shape of a reader over a genuine
+time series: the twelve monthly mean-temperature layers of WorldClim,
+downloaded once with the
+[geodata](https://CRAN.R-project.org/package=geodata) package and
+wrapped as an
+[`xyt_source()`](https://australianantarcticdivision.github.io/xyt/reference/xyt_source.md).
+
+``` r
+
+library(geodata)
+
+## twelve monthly layers: wc2.1_10m_tavg_01 ... _12
+tavg <- worldclim_global(var = "tavg", res = 10, path = tempdir())
+
+## a catalogue of one row per month, dated to a representative year
+catalogue <- data.frame(
+  date = as.POSIXct(sprintf("2020-%02i-15", 1:12), tz = "UTC")
+)
+
+worldclim_src <- xyt_source(
+  slice = function(date, files, ...) {
+    i <- which(files$date == date)
+    tavg[[i]]
+  },
+  catalogue = catalogue
+)
+
+## a couple of points, each in a different month
+pts <- data.frame(
+  lon  = c(147.3, 2.35),
+  lat  = c(-42.9, 48.85),
+  time = as.POSIXct(c("2020-01-15", "2020-07-15"), tz = "UTC")
+)
+
+## check the reader against the contract, then extract
+xyt_reader_check(worldclim_src)
+extract_xyt(worldclim_src, pts)
+
+## interpolate between monthly slices for points mid-month
+extract_xyt(worldclim_src, pts, ctstime = TRUE, method = "bilinear")
+```
+
+The same pattern covers any collection a reader can reach: local files,
+a `/vsicurl/` path, a database, an in-memory list.
+[`extract_xyt()`](https://australianantarcticdivision.github.io/xyt/reference/extract_xyt.md)
+only ever asks for the catalogue and, one at a time, the slices it
+needs.
+
+## Reading slices in parallel
+
+Each slice is read independently and returns a plain numeric vector; no
+`SpatRaster` crosses a process boundary. So the reads can run on
+[mirai](https://CRAN.R-project.org/package=mirai) daemons, and
+[`extract_xyt()`](https://australianantarcticdivision.github.io/xyt/reference/extract_xyt.md)
+will use them without being told to:
+
+``` r
+
+mirai::daemons(6)
+mirai::everywhere({ library(terra) })   # load whatever the reader needs
+
+extract_xyt(worldclim_src, pts)
+
+mirai::daemons(0)
+```
+
+[`mirai::everywhere()`](https://mirai.r-lib.org/reference/everywhere.html)
+matters: a daemon runs the reader in a fresh session, so any package the
+reader reaches for has to be loaded there. Pass `map = lapply` to force
+serial reads. Whether daemons are faster is a question about where the
+bytes come from, not about the code — a hundred slices off a remote
+store parallelises well; ten off a saturated local disk does not.
