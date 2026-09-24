@@ -23,12 +23,4 @@ The one NOTE is the expected first-submission note:
     Maintainer: 'Michael D. Sumner <mdsumner@gmail.com>'
     New submission
 
-## Notes for reviewers
 
-* Examples, tests and the vignette run against a self-contained synthetic
-  reader (`synthetic_reader()`) with no files, network or credentials behind
-  it, so they build and run anywhere 'terra' is installed.
-* The vignette's real-data section (using the 'geodata' package) is not
-  evaluated, so building the vignette does not reach the network.
-* mirai, mori and geodata are used only in Suggests and are guarded with
-  `requireNamespace()`.
