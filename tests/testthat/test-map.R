@@ -69,3 +69,45 @@ test_that("a single needed slice never reaches the map at all", {
   one <- data.frame(x = 0.5, y = 0.5, t = d1)
   expect_equal(extract_xyt(read, one, map = never), 51.5)
 })
+
+## The tests below actually start daemons, so they are skipped on CRAN and
+## anywhere mirai is absent. They exercise the real mirai path in map.R:
+## .mirai_daemons() seeing running daemons, .resolve_map() dispatching to
+## them, and xyt_map_mirai() collecting results and surfacing task failures.
+
+test_that("xyt_map_mirai runs a job across daemons and returns results", {
+  skip_on_cran()
+  skip_if_not_installed("mirai")
+
+  mirai::daemons(2)
+  on.exit(mirai::daemons(0), add = TRUE)
+
+  expect_gte(.mirai_daemons(), 1L)
+
+  m <- xyt_map_mirai()
+  expect_true(is.function(m))
+  expect_equal(m(1:3, function(i) i * 2), list(2, 4, 6))
+})
+
+test_that("a failing task on a daemon is reported, not swallowed", {
+  skip_on_cran()
+  skip_if_not_installed("mirai")
+
+  mirai::daemons(2)
+  on.exit(mirai::daemons(0), add = TRUE)
+
+  m <- xyt_map_mirai()
+  expect_error(m(1:2, function(i) stop("boom")), "failed on a mirai daemon")
+})
+
+test_that("with daemons running the default map dispatches to mirai", {
+  skip_on_cran()
+  skip_if_not_installed("mirai")
+
+  mirai::daemons(2)
+  on.exit(mirai::daemons(0), add = TRUE)
+
+  m <- .resolve_map(NULL, verbose = FALSE, total = 3L)
+  expect_true(is.function(m))
+  expect_equal(m(1:3, function(i) i + 1L), list(2, 3, 4))
+})

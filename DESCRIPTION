@@ -3,8 +3,8 @@ Type: Package
 Title: Extract Raster Time Series Values at Points in Space and Time
 Version: 0.1.0
 Authors@R: c(
-   person("Michael D.", "Sumner", role = c("aut", "cre"), email = "mdsumner@gmail.com")
-   )
+   person("Michael D.", "Sumner", role = c("aut", "cre"), email = "mdsumner@gmail.com", 
+   comment = c(ORCID = "0000-0002-2471-7511")))
 Description: Extract values from a time series of rasters at points that each
     carry their own date-time. The series is described by a reader function
     rather than by data held in memory, so only the time slices actually
@@ -16,11 +16,14 @@ Depends:
 Imports:
     terra (>= 1.7.0)
 Suggests:
+    knitr,
     mirai (>= 1.3.0),
     mori (>= 0.2.0),
+    rmarkdown,
     testthat (>= 3.0.0)
 License: GPL-3
 Encoding: UTF-8
+VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0
