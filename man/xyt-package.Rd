@@ -37,11 +37,11 @@ handing it to \code{\link[=extract_xyt]{extract_xyt()}}.
 \code{\link[=extract_xyt]{extract_xyt()}}, \code{\link[=xyt_reader_check]{xyt_reader_check()}}, \code{\link[=synthetic_reader]{synthetic_reader()}}
 }
 \author{
-\strong{Maintainer}: Michael D. Sumner \email{michael.sumner@aad.gov.au}
+\strong{Maintainer}: Michael D. Sumner \email{mdsumner@gmail.com} (\href{https://orcid.org/0000-0002-2471-7511}{ORCID})
 
 Authors:
 \itemize{
-  \item Michael D. Sumner \email{michael.sumner@aad.gov.au}
+  \item Michael D. Sumner \email{mdsumner@gmail.com} (\href{https://orcid.org/0000-0002-2471-7511}{ORCID})
 }
 
 }

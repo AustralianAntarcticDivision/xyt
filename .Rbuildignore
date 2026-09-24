@@ -5,4 +5,7 @@
 ^\.Rproj\.user$
 ^CODE_OF_CONDUCT\.md$
 ^cran-comments\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
 ^xyt\.Rproj$
