@@ -3,7 +3,7 @@ Type: Package
 Title: Extract Raster Time Series Values at Points in Space and Time
 Version: 0.1.0
 Authors@R: c(
-   person("Michael D.", "Sumner", role = c("aut", "cre"), email = "michael.sumner@aad.gov.au")
+   person("Michael D.", "Sumner", role = c("aut", "cre"), email = "mdsumner@gmail.com")
    )
 Description: Extract values from a time series of rasters at points that each
     carry their own date-time. The series is described by a reader function
