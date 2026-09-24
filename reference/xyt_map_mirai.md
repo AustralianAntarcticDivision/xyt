@@ -51,3 +51,29 @@ not.
 ## See also
 
 [`extract_xyt()`](https://australianantarcticdivision.github.io/xyt/reference/extract_xyt.md)
+
+## Examples
+
+``` r
+if (requireNamespace("mirai", quietly = TRUE)) {
+  ## a mapper to hand to extract_xyt(map = )
+  mapper <- xyt_map_mirai()
+  mapper
+}
+#> function (X, FUN) 
+#> {
+#>     m <- do.call(mirai::mirai_map, c(list(.x = X, .f = FUN), 
+#>         args))
+#>     out <- m[]
+#>     bad <- vapply(out, inherits, logical(1), "miraiError")
+#>     if (any(bad)) {
+#>         stop("a slice failed on a mirai daemon: ", conditionMessage(out[[which(bad)[1L]]]), 
+#>             "\n  a daemon starts with a bare session; mirai::everywhere() is where", 
+#>             "\n  the packages your reader needs get loaded", 
+#>             call. = FALSE)
+#>     }
+#>     out
+#> }
+#> <bytecode: 0x55696e495258>
+#> <environment: 0x55696e4940a0>
+```

@@ -37,9 +37,9 @@ to test a function against the contract before handing it to
 ## Author
 
 **Maintainer**: Michael D. Sumner <mdsumner@gmail.com>
-([ORCID](https://orcid.org/0000-0002-2471-7511))
+([ORCID](https://orcid.org/0000-0002-2471-7511)) \[copyright holder\]
 
 Authors:
 
 - Michael D. Sumner <mdsumner@gmail.com>
-  ([ORCID](https://orcid.org/0000-0002-2471-7511))
+  ([ORCID](https://orcid.org/0000-0002-2471-7511)) \[copyright holder\]

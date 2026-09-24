@@ -89,6 +89,31 @@ Reading ten slices off a local disk that is already saturated will not.</p>
     <div class="dont-index"><p><code><a href="extract_xyt.html">extract_xyt()</a></code></p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"mirai"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>  <span class="co">## a mapper to hand to extract_xyt(map = )</span></span></span>
+<span class="r-in"><span>  <span class="va">mapper</span> <span class="op">&lt;-</span> <span class="fu">xyt_map_mirai</span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">mapper</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> function (X, FUN) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     m &lt;- do.call(mirai::mirai_map, c(list(.x = X, .f = FUN), </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         args))</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     out &lt;- m[]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     bad &lt;- vapply(out, inherits, logical(1), "miraiError")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     if (any(bad)) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         stop("a slice failed on a mirai daemon: ", conditionMessage(out[[which(bad)[1L]]]), </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             "\n  a daemon starts with a bare session; mirai::everywhere() is where", </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             "\n  the packages your reader needs get loaded", </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             call. = FALSE)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     out</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;bytecode: 0x55696e495258&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55696e4940a0&gt;</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
